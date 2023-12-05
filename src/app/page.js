@@ -61,6 +61,8 @@ export default function Home() {
   const [animate, setanimate] = useState(false);
   const [filter, setfilter] = useState("");
   const [mask, setmask] = useState("");
+  const [disconnectedHosts, setDisconnectedHosts] = useState([]);
+
 
   const validate = ({ text }) => {
     if (isValidCIDR(text)) {
@@ -71,19 +73,30 @@ export default function Home() {
 
   useEffect(() => {
     if (scan) {
-      fetch(`http://127.0.0.1:5000/api/networkscan?network=${network}&retries=${retries}&timeout=${timeout}
-      `)
+      fetch(`http://127.0.0.1:5000/api/networkscan?network=${network}&retries=${retries}&timeout=${timeout}`)
         .then((response) => response.json())
-        .then((response) => setData(JSON.parse(response)))
-        .then(console.log);
-      sethosts(data.length);
+        .then((response) => {
+          const previousHosts = data.map((host) => host);
+          const responseData = JSON.parse(response);
+          setData(responseData);
+  
+          const disconnectedHosts = previousHosts.filter((previousHost) => {
+            // Assuming 'id' is a unique identifier property for hosts
+            return !responseData.some((currentHost) => currentHost.mac === previousHost.mac);
+          });
+  
+          setDisconnectedHosts(disconnectedHosts);
+          console.log(disconnectedHosts);
+        });
+  
+      sethosts(data.length); // ???
       setscan(false);
       const msk = network.split("/");
       setmask(msk[1]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scan]);
-
+  
   return (
     <main className="flex flex-col h-max p-5 w-max rounded-l-3xl bg-white space-y-5 justify-self-center">
       <div className="flex flex-col p-5 bg-blue-50 rounded-xl w-max self-center space-y-3 text-black shadow-xl">
@@ -122,10 +135,10 @@ export default function Home() {
           <div className="flex flex-row space-x-5 align-middle items-center">
             <Card
               title={`Network: ${network}`}
-              subtitles={[`Mask: ${mask}`, `Host capacity: ${hosts}`]}
+              subtitles={[`Mask: ${mask}`, `Host capacity: 2048`]}
             />
             <Card title={data.length} subtitles={["Active"]} />
-            <Card title={12} subtitles={["Network devices"]} />
+            <Card title={filterObjectsBySubstring(data, "ruckus").length} subtitles={["Network devices"]} />
           </div>
 
           <input
@@ -148,6 +161,22 @@ export default function Home() {
       ) : (
         <></>
       )}
+      {disconnectedHosts.length > 0 && 
+      <div>
+        <p className="text-black justify-center font-semibold">Disconnected during this session: </p>
+        <div className="grid grid-flow-row grid-cols-3 gap-4 p-2 items-center content-center justify-center w-content">
+          {filterObjectsBySubstring(disconnectedHosts, filter).map((device) => (
+            <Device
+              key={device.mac}
+              ip={device.ip}
+              mac={device.mac}
+              vendor={device.vendor}
+            ></Device>
+          ))}
+        </div>
+      </div>
+      
+      }
     </main>
   );
 }
