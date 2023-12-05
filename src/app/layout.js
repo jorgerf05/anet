@@ -1,6 +1,5 @@
 import { Nunito } from "next/font/google";
 import "./globals.css";
-import Sidebar from "./components/Sidebar";
 import TopBar from "./components/TopBar";
 
 const nunito = Nunito({ subsets: ["latin"] });
@@ -12,12 +11,12 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className="bg-white">
-      <body className={`${nunito.className} flex flex-col bg-white overflow-y-scroll`}>
-        <header className="flex w-full h-content sticky top-0 backdrop-blur-xl bg-blue-100/20">
+    <html lang="en">
+      <body className={`${nunito.className} bg-blue-50 flex flex-col overflow-y-scroll`}>
+        <header className="backdrop-blur-md bg-blue-100/50 flex w-full h-content sticky top-0 ml-5 mr-5 rounded-b-2xl">
           <TopBar/>
         </header>
-        <main className="flex w-full bg-white">{children}</main>
+        <main className="flex w-full bg-white justify-center">{children}</main>
       </body>
     </html>
   );

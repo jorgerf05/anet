@@ -1,21 +1,17 @@
 "use client";
 import { useEffect, useState } from "react";
 import Card from "./components/Card";
-import DifferentLength from "./components/Chart";
 import Device from "./components/Device";
 
 function isValidCIDR(input) {
-  // Regular expression for CIDR notation
   const cidrRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(\/\d{2})$/;
-
-  // Check if the input matches the CIDR notation
   const match = input.match(cidrRegex);
 
   if (!match) {
     return false;
   }
 
-  // Check if each IP component is within the valid range (0-255)
+  // check valid range (0-255)
   for (let i = 1; i <= 4; i++) {
     const octet = parseInt(match[i], 10);
     if (isNaN(octet) || octet < 0 || octet > 255) {
@@ -23,10 +19,10 @@ function isValidCIDR(input) {
     }
   }
 
-  // Check if the subnet mask (if present) is valid
+  // subnet mask
   if (match[5]) {
     const subnetMask = parseInt(match[5].substring(1), 10);
-    if (isNaN(subnetMask) || subnetMask < 0 || subnetMask > 32) {
+    if (isNaN(subnetMask) || subnetMask < 0 || subnetMask > 31) {
       return false;
     }
   }
@@ -34,42 +30,90 @@ function isValidCIDR(input) {
   return true;
 }
 
+function filterObjectsBySubstring(objects, searchString, set) {
+  if (searchString === "") {
+    return objects;
+  }
+  const searchLowerCase = searchString.toLowerCase();
+
+  return objects.filter((obj) => {
+    for (let key in obj) {
+      if (
+        obj.hasOwnProperty(key) &&
+        typeof obj[key] === "string" &&
+        obj[key].toLowerCase().includes(searchLowerCase)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
 export default function Home() {
   const [data, setData] = useState([]);
   const [network, setnetwork] = useState("");
-  const [networkstring, setnetworkstring] = useState("");
+  const [text, settext] = useState("");
+  const [hosts, sethosts] = useState(0);
+  const [retries, setretries] = useState(3);
+  const [timeout, settimeout] = useState(15);
+  const [scan, setscan] = useState(false);
+  const [animate, setanimate] = useState(false);
+  const [filter, setfilter] = useState("");
+  const [mask, setmask] = useState("");
 
-  const scan = ({ networkstring}) => {
-    if (isValidCIDR(networkstring)) {
-      console.log(networkstring);
-      setnetwork(networkstring);
+  const validate = ({ text }) => {
+    if (isValidCIDR(text)) {
+      setnetwork(text);
+      setscan(true);
     }
   };
-  
 
   useEffect(() => {
-    fetch(`http://127.0.0.1:5000/api/networkscan?network=${network}`)
-      .then((response) => response.json())
-      .then((response) => setData(JSON.parse(response)))
-      .then(console.log);
-  }, [network]);
-
-  const mask = "255.255.255.0";
-  const hosts = 250;
+    if (scan) {
+      fetch(`http://127.0.0.1:5000/api/networkscan?network=${network}&retries=${retries}&timeout=${timeout}
+      `)
+        .then((response) => response.json())
+        .then((response) => setData(JSON.parse(response)))
+        .then(console.log);
+      sethosts(data.length);
+      setscan(false);
+      const msk = network.split("/");
+      setmask(msk[1]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scan]);
 
   return (
-    <main className="flex flex-col h-max p-5 w-full rounded-l-3xl bg-white space-y-5">
-      <div className="flex flex-col p-5 bg-blue-200 rounded-xl w-max self-center space-y-3 text-black">
+    <main className="flex flex-col h-max p-5 w-max rounded-l-3xl bg-white space-y-5 justify-self-center">
+      <div className="flex flex-col p-5 bg-blue-50 rounded-xl w-max self-center space-y-3 text-black shadow-xl">
+        <p>Network</p>
         <input
-          className="text-black"
-          placeholder="Network to be scanned...."
-          onChange={(event) => setnetworkstring(event.target.value)}
+          className="text-black rounded-xl shadow-xl p-2"
+          placeholder="Eg: 10.10.10.0/24"
+          onChange={(event) => settext(event.target.value)}
+        ></input>
+        <p>Number of retries</p>
+        <input
+          className="text-black rounded-xl shadow-xl p-2"
+          placeholder="Retries: 5"
+          onChange={(event) => setretries(event.target.value)}
+        ></input>
+        <p>Timeout</p>
+        <input
+          className="text-black rounded-xl shadow-xl p-2"
+          placeholder="Timeout: 15(s)"
+          onChange={(event) => settimeout(event.target.value)}
         ></input>
         <button
-          className="bg-green-300 rounded-xl p-2"
-          onClick={() => scan({ networkstring, setnetwork })}
+          className={`bg-black text-white rounded-xl p-2 shadow-md hover:bg-green-200 duration-300 hover:text-black hover:shadow-green-500 ${
+            animate && "animate-ping"
+          }`}
+          onClick={() => validate({ text })}
+          onMouseDown={() => setanimate(true)}
+          onMouseUp={() => setanimate(false)}
         >
-          Press me
+          Scan
         </button>
       </div>
 
@@ -80,17 +124,23 @@ export default function Home() {
               title={`Network: ${network}`}
               subtitles={[`Mask: ${mask}`, `Host capacity: ${hosts}`]}
             />
-            <Card title={200} subtitles={["Active"]} />
+            <Card title={data.length} subtitles={["Active"]} />
             <Card title={12} subtitles={["Network devices"]} />
           </div>
 
-          <div className="grid grid-flow-row grid-cols-6 gap-4 p-2 items-center content-center justify-center">
-            {data.map((objeto) => (
+          <input
+            className="text-black rounded-full justify-self-center p-5 bg-blue-50 shadow-2xl border-2 border-blue-100 "
+            placeholder="Search:"
+            onChange={(event) => setfilter(event.target.value)}
+          />
+
+          <div className="grid grid-flow-row grid-cols-3 gap-4 p-2 items-center content-center justify-center w-content">
+            {filterObjectsBySubstring(data, filter).map((device) => (
               <Device
-                key={objeto.mac}
-                ip={objeto.ip}
-                mac={objeto.mac}
-                vendor={objeto.vendor}
+                key={device.mac}
+                ip={device.ip}
+                mac={device.mac}
+                vendor={device.vendor}
               ></Device>
             ))}
           </div>
